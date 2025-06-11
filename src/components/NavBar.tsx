@@ -7,6 +7,7 @@ const NavBar = () => (
     <div className="navbar-menu">
       <a href="/">홈</a>
       <a href="/new">글쓰기</a>
+      <a href="/wallet">지갑</a>
     </div>
   </nav>
 );

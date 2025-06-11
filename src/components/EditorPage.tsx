@@ -6,11 +6,9 @@ import PostEditor from './PostEditor';
 
 interface EditorPageProps {
   addPost: (title: string, content: string) => void;
-  darkMode: boolean;
-  toggleDarkMode: () => void;
 }
 
-const EditorPage: React.FC<EditorPageProps> = ({ addPost, darkMode, toggleDarkMode }) => (
+const EditorPage: React.FC<EditorPageProps> = ({ addPost }) => (
   <div>
     <NavBar />
     <div style={{ display: 'flex', maxWidth: 1200, margin: '32px auto' }}>
@@ -22,5 +20,6 @@ const EditorPage: React.FC<EditorPageProps> = ({ addPost, darkMode, toggleDarkMo
     </div>
   </div>
 );
+
 
 export default EditorPage;

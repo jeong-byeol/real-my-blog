@@ -6,11 +6,9 @@ import PostList from './PostList';
 
 interface HomePageProps {
   posts: { id: string; title: string; content: string }[];
-  darkMode: boolean;
-  toggleDarkMode: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ posts, darkMode, toggleDarkMode }) => (
+const HomePage: React.FC<HomePageProps> = ({ posts }) => (
   <div>
     <NavBar />
     <div style={{ display: 'flex', maxWidth: 1200, margin: '32px auto' }}>
@@ -22,5 +20,6 @@ const HomePage: React.FC<HomePageProps> = ({ posts, darkMode, toggleDarkMode }) 
     </div>
   </div>
 );
+
 
 export default HomePage;

@@ -10,11 +10,9 @@ interface PostPageProps {
   posts: { id: string; title: string; content: string }[];
   comments: { id: string; postId: string; text: string }[];
   addComment: (postId: string, text: string) => void;
-  darkMode: boolean;
-  toggleDarkMode: () => void;
 }
 
-const PostPage: React.FC<PostPageProps> = ({ posts, comments, addComment, darkMode, toggleDarkMode }) => {
+const PostPage: React.FC<PostPageProps> = ({ posts, comments, addComment }) => {
   const { id } = useParams<{ id: string }>();
 
   if (!id) {
@@ -39,5 +37,6 @@ const PostPage: React.FC<PostPageProps> = ({ posts, comments, addComment, darkMo
     </div>
   );
 };
+
 
 export default PostPage;
