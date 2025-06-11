@@ -39,7 +39,7 @@ function App() {
   };
 
   return (
-    <Router>
+    <Router basename="/real-my-blog">
       <div className="App">
         <Routes>
           <Route path="/" element={<HomePage posts={posts} />} />
