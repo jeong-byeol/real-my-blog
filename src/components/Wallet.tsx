@@ -1,32 +1,73 @@
-import React, { useState } from "react";
+import React, { useState } from "react"; 
 import Web3 from "web3";
-import "./Wallet.css";
+import * as bip39 from "bip39";
+import { Wallet as EthersWallet } from "ethers";
+import "./Wallet.css"; 
+import NavBar from "./NavBar";
 
-const web3 = new Web3((window as any).ethereum); // MetaMask provider
+const web3 = new Web3();
 
 const Wallet = () => {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null); // 주소 생성
+  const [privateKey, setPrivateKey] = useState<string | null>(null); // privatekey 생성
+  const [copyMessage, setcopyMessage] =useState<string | null>(null); // privatekey 복사 메세지
+  const [mnemonic, setMnemonic] = useState<string | null>(null); // 니모닉 문구 생성
+  const [mnemonicInput, setMnemonicInput] = useState(''); // 니모닉 문구 입력창
+  const [restoreError, setRestoreError] = useState<string | null>(null); // 복구 실패 시 문구
+  const [restoreAddress, setrestoreAddress] = useState<string | null>(null); // 복구 시 주소
+  const [restorePrivateKey, setrestorePrivateKey] = useState<string | null>(null); //복구 시 개인키
   const [balance, setBalance] = useState<string | null>(null);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [txHash, setTxHash] = useState<string | null>(null);
 
-  const connectMetaMask = async () => {
-    if ((window as any).ethereum) {
-      try {
-        const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
-        setWalletAddress(accounts[0]);
-        setTxHash(null);
-        setBalance(null);
-      } catch (err) {
-        console.error("MetaMask 연결 실패:", err);
+  const createWalletFromMnemonic = async () => {
+   try { 
+    const generatedMnemonic = bip39.generateMnemonic(); // 12단어 니모닉 생성
+    console.log("Generated mnemonic:", generatedMnemonic);
+    const hdWallet = EthersWallet.fromMnemonic(generatedMnemonic); // 지갑 생성
+    console.log("HD Wallet address:", hdWallet.address);
+
+    setMnemonic(generatedMnemonic);
+    setWalletAddress(hdWallet.address);
+    setPrivateKey(hdWallet.privateKey);
+    setcopyMessage(null);
+   } catch (err) {
+    console.error("지갑 생성 실패:", err);
+   }
+  };
+
+  const restoreWalletFromMnemonic = () => { // 지갑 복구 기능
+    try {
+      if (!bip39.validateMnemonic(mnemonicInput)) {
+        setRestoreError("올바르지 않은 니모닉입니다.");
+        return;
       }
-    } else {
-      alert("MetaMask가 설치되어 있지 않습니다.");
+
+    const wallet = EthersWallet.fromMnemonic(mnemonicInput.trim());
+    setrestoreAddress(wallet.address);
+    setrestorePrivateKey(wallet.privateKey);
+    setcopyMessage(null);
+    setRestoreError(null);
+    } catch (err) {
+    console.error("복원 실패:", err);
+    setRestoreError("지갑 복원에 실패했습니다.");
     }
   };
 
-  const getBalance = async () => {
+  
+  const copyToClipboard = async () => {  //privatekey 복사 기능
+    if (!privateKey) return;
+    try {
+      await navigator.clipboard.writeText(privateKey);
+      setcopyMessage("개인키가 복사되었습니다.");
+      setTimeout(() => setcopyMessage(null), 2000);
+    } catch (err) {
+      setcopyMessage("복사 실패");
+    }
+  };
+
+  const getBalance = async () => { //잔액조회
     if (!walletAddress) return;
     try {
       const balanceWei = await web3.eth.getBalance(walletAddress);
@@ -37,7 +78,7 @@ const Wallet = () => {
     }
   };
 
-  const sendViaMetaMask = async () => {
+  const sendViaMetaMask = async () => { //송금하기
     if (!walletAddress || !recipient || !amount) {
       alert("주소, 수신자, 금액을 모두 입력해주세요.");
       return;
@@ -68,19 +109,41 @@ const Wallet = () => {
 
   return (
     <div className="wallet-container">
+      <NavBar />
       <div className="wallet-header">
-        <h1>MetaMask 지갑</h1>
+        <h1>지갑 생성기</h1>
 
         {!walletAddress ? (
-          <button onClick={connectMetaMask} className="action-button">MetaMask 연결</button>
+          <button onClick={createWalletFromMnemonic} className="action-button">니모닉 지갑생성</button>
         ) : (
+          <div>
           <div style={{ wordBreak: 'break-all', textAlign: 'left' }}>
-            <p><strong>주소:</strong> {walletAddress}</p>
+            {mnemonic && (<div><p><strong>니모닉 문구:</strong> {mnemonic}</p></div>)}
+            <p><strong>생성된 주소 :</strong> {walletAddress}</p>
             <button onClick={getBalance} className="action-button">잔액 조회</button>
+            <button onClick={copyToClipboard} className="action-bytton">개인키 복사</button>
+            {copyMessage && <p style={{ color: "green" }}>{copyMessage}</p>}
           </div>
+          <div style={{ marginBottom: "1rem" }}>
+          <h3>주소 가져오기</h3>
+          <textarea
+          value={mnemonicInput}
+          onChange={(e) => setMnemonicInput(e.target.value)}
+          placeholder="니모닉문구을 입력하세요."
+          rows={1}
+          style={{ width: "100%", resize: "none" }}/>
+          <button onClick={restoreWalletFromMnemonic} className="action-button" style={{ marginTop: "0.5rem" }}>가져오기</button>
+          {restoreError && <p style={{ color: "red" }}>{restoreError}</p>}
+          <div style={{ wordBreak: 'break-all', textAlign: 'left' }}>
+          <p><strong>복구된 주소 :</strong> {restoreAddress}</p>
+          <p><strong>복구된 개인키 :</strong> {restorePrivateKey}</p>
+          </div>
+        </div>
+        </div>
         )}
-      </div>
+        
 
+      </div>
       {balance && (
         <div className="wallet-balance">
           <div className="balance-info">
