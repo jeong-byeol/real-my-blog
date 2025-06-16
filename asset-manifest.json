@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/real-my-blog/static/css/main.82e0c9c2.css",
-    "main.js": "/real-my-blog/static/js/main.e75ebbac.js",
+    "main.css": "/real-my-blog/static/css/main.087ee0e5.css",
+    "main.js": "/real-my-blog/static/js/main.64c68880.js",
     "static/js/453.9b5366df.chunk.js": "/real-my-blog/static/js/453.9b5366df.chunk.js",
     "index.html": "/real-my-blog/index.html",
-    "main.82e0c9c2.css.map": "/real-my-blog/static/css/main.82e0c9c2.css.map",
-    "main.e75ebbac.js.map": "/real-my-blog/static/js/main.e75ebbac.js.map",
+    "main.087ee0e5.css.map": "/real-my-blog/static/css/main.087ee0e5.css.map",
+    "main.64c68880.js.map": "/real-my-blog/static/js/main.64c68880.js.map",
     "453.9b5366df.chunk.js.map": "/real-my-blog/static/js/453.9b5366df.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.82e0c9c2.css",
-    "static/js/main.e75ebbac.js"
+    "static/css/main.087ee0e5.css",
+    "static/js/main.64c68880.js"
   ]
 }
