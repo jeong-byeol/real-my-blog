@@ -5,7 +5,8 @@ import './App.css';
 import HomePage from './components/HomePage';
 import EditorPage from './components/EditorPage';
 import PostPage from './components/PostPage';
-import Wallet from './components/Wallet';
+import WalletPage from './components/WalletPage';
+import ExplorerPage from './components/ExplorerPage';
 
 interface Post {
   id: string;
@@ -54,8 +55,9 @@ function App() {
               />
             }
           />
-          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/walletPage" element={<WalletPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/ExplorerPage" element={<ExplorerPage />} />
         </Routes>
       </div>
     </Router>

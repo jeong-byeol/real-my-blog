@@ -8,7 +8,8 @@ const NavBar = () => (
     <div className="navbar-menu">
       <Link to="/">홈</Link>
       <Link to="/new">글쓰기</Link>
-      <Link to="/wallet">지갑</Link>
+      <Link to="/walletPage">지갑</Link>
+      <Link to="/explorerPage">블록 익스플로어</Link>
     </div>
   </nav>
 );

@@ -5,7 +5,7 @@ import { Wallet as EthersWallet } from "ethers";
 import "./Wallet.css"; 
 import NavBar from "./NavBar";
 
-const web3 = new Web3();
+const web3 = new Web3("https://rpc-amoy.polygon.technology");
 
 const Wallet = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null); // 주소 생성
@@ -16,7 +16,8 @@ const Wallet = () => {
   const [restoreError, setRestoreError] = useState<string | null>(null); // 복구 실패 시 문구
   const [restoreAddress, setrestoreAddress] = useState<string | null>(null); // 복구 시 주소
   const [restorePrivateKey, setrestorePrivateKey] = useState<string | null>(null); //복구 시 개인키
-  const [balance, setBalance] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null); //현재 잔액
+  const [customAddress, setCustomAddress] = useState(''); // 주소 조회 입력창
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -36,6 +37,19 @@ const Wallet = () => {
     console.error("지갑 생성 실패:", err);
    }
   };
+
+  const getCustomAddressBalance = async () => { // 주소 조회 시 현재 잔액 
+  if (!customAddress) return;
+  try {
+    const balanceWei = await web3.eth.getBalance(customAddress);
+    const ethBalance = web3.utils.fromWei(balanceWei, "ether");
+    setBalance(ethBalance);
+  } catch (err) {
+    console.error("잔액 조회 실패:", err);
+    alert("잔액 조회 실패: " + (err as Error).message);
+  }
+};
+
 
   const restoreWalletFromMnemonic = () => { // 지갑 복구 기능
     try {
@@ -78,34 +92,74 @@ const Wallet = () => {
     }
   };
 
-  const sendViaMetaMask = async () => { //송금하기
-    if (!walletAddress || !recipient || !amount) {
-      alert("주소, 수신자, 금액을 모두 입력해주세요.");
+  const sendBetweenLocalWallets = async () => { //직접 서명해서 송금 
+  if (!walletAddress || !privateKey || !recipient || !amount) {
+    alert("정보가 부족합니다.");
+    return;
+  }
+
+  try {
+    const nonce = await web3.eth.getTransactionCount(walletAddress, "latest");
+    const tx = {
+      to: recipient,
+      value: web3.utils.toWei(amount, "ether"),
+      gas: 21000,
+      nonce,
+      chainId: 80002 // Amoy testnet
+    };
+
+    const signedTx = await web3.eth.accounts.signTransaction(tx, privateKey);
+
+    if (!signedTx.rawTransaction) {
+      alert("트랜잭션 서명 실패: rawTransaction이 없습니다.");
       return;
     }
 
-    const confirmed = window.confirm(`다음 정보를 확인하세요:\n\n받는 사람: ${recipient}\n금액: ${amount} ETH\n\n정말 송금하시겠습니까?`);
-    if (!confirmed) return;
+    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
-    try {
-      const txParams = {
-        from: walletAddress,
-        to: recipient,
-        value: web3.utils.toHex(web3.utils.toWei(amount, "ether")),
-        gas: web3.utils.toHex(21000),
-      };
-
-      const txHash = await (window as any).ethereum.request({
-        method: "eth_sendTransaction",
-        params: [txParams],
-      });
-
-      setTxHash(txHash);
-    } catch (err) {
-      console.error("송금 실패:", err);
-      alert("송금 실패: " + (err as Error).message);
+    if (receipt && receipt.transactionHash) {
+      setTxHash(receipt.transactionHash.toString());
+    } else {
+      alert("트랜잭션은 전송되었지만 해시를 찾을 수 없습니다.");
+      console.log("receipt", receipt);
     }
-  };
+    
+  } catch (err) {
+    console.error("송금 실패:", err);
+    alert("송금 실패: " + (err as Error).message);
+  }
+};
+
+
+  // const sendViaMetaMask = async () => { //MetaMask 송금하기
+  //   if (!walletAddress || !recipient || !amount) {
+  //     alert("주소, 수신자, 금액을 모두 입력해주세요.");
+  //     return;
+  //   }
+
+  //   const confirmed = window.confirm(`다음 정보를 확인하세요:\n\n받는 사람: ${recipient}\n금액: ${amount} ETH\n\n정말 송금하시겠습니까?`);
+  //   if (!confirmed) return;
+
+  //   try {
+      
+  //     const txParams = {
+  //       from: walletAddress,
+  //       to: recipient,
+  //       value: web3.utils.toHex(web3.utils.toWei(amount, "ether")),
+  //       gas: web3.utils.toHex(21000),
+  //     };
+
+  //     const txHash = await (window as any).ethereum.request({
+  //       method: "eth_sendTransaction",
+  //       params: [txParams],
+  //     });
+
+  //     setTxHash(txHash);
+  //   } catch (err) {
+  //     console.error("송금 실패:", err);
+  //     alert("송금 실패: " + (err as Error).message);
+  //   }
+  // };
 
   return (
     <div className="wallet-container">
@@ -140,10 +194,20 @@ const Wallet = () => {
           </div>
         </div>
         </div>
-        )}
-        
-
+        )}     
       </div>
+        <div className="wallet-actions" style={{ marginTop: "2rem" }}>
+          <h3>주소 잔액 조회</h3>
+          <input
+            type="text"
+            placeholder="조회할 주소를 입력하세요"
+            value={customAddress}
+            onChange={(e) => setCustomAddress(e.target.value)}
+             style={{ width: "100%", marginBottom: "0.5rem" }}
+          />
+          <button onClick={getCustomAddressBalance} className="action-button">잔액 조회</button>
+      </div>
+
       {balance && (
         <div className="wallet-balance">
           <div className="balance-info">
@@ -168,7 +232,7 @@ const Wallet = () => {
             onChange={(e) => setAmount(e.target.value)}
             style={{ width: "120px" }}
           />
-          <button onClick={sendViaMetaMask} className="action-button">송금하기</button>
+          <button onClick={sendBetweenLocalWallets } className="action-button">송금하기</button>
         </div>
       )}
 
