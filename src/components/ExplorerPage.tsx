@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import Web3 from 'web3';
 import NavBar from './NavBar';
+import TxHashDetail from './TxhashDetail';
+import './ExplorerPage.css';
 
-const web3 = new Web3('https://rpc-amoy.polygon.technology'); 
+const web3 = new Web3('https://polygon-rpc.com'); 
+
+const POLYGONSCAN_API_KEY = '1Q34UIA6I4HKS4HZ3D6C3592Q4SHZPUGND';
 
 const BlockchainExplorer = () => {
-  const [txHash, setTxHash] = useState('');
+  const [txHash, setTxHash] = useState('');  
   const [txInfo, setTxInfo] = useState<any | null>(null); 
   const [blockNumber, setBlockNumber] = useState('');
   const [blockInfo, setBlockInfo] = useState<any | null>(null);
@@ -17,25 +21,21 @@ const BlockchainExplorer = () => {
     latestBlockNumber: number;
     gasPrice: string;
   } | null>(null);
+  const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
-  const safeStringify = (data: any) =>
-  JSON.stringify(data, (_, value) =>
-    typeof value === 'bigint' ? value.toString() : value, 2);
-
-
-  const fetchTransaction = async () => {
+  const fetchTransaction = async () => { // 트랜잭션 조회
     try {
-      const tx = await web3.eth.getTransaction(txHash);
-      const receipt = await web3.eth.getTransactionReceipt(txHash);
-      setTxInfo({ ...tx, status: receipt.status });
+      const tx = await web3.eth.getTransaction(txHash); //트랜잭션 세부 정보
+      const receipt = await web3.eth.getTransactionReceipt(txHash); 
+      setTxInfo({ ...tx, status: receipt.status }); //트랜잭션 상태 1 or 0
     } catch (err) {
       alert('트랜잭션 정보를 불러오지 못했습니다.');
     }
   };
 
-  const fetchBlock = async () => {
+  const fetchBlock = async () => { // 블록 정보 조회
     try {
-      const block = await web3.eth.getBlock(Number(blockNumber), true);
+      const block = await web3.eth.getBlock(Number(blockNumber), true); 
       setBlockInfo(block);
     } catch (err) {
       alert('블록 정보를 불러오지 못했습니다.');
@@ -48,18 +48,6 @@ const BlockchainExplorer = () => {
       setBalance(web3.utils.fromWei(balanceWei, 'ether'));
     } catch (err) {
       alert('잔액을 조회할 수 없습니다.');
-    }
-  };
-
-  const fetchTxList = async () => {
-    try {
-      const latest = await web3.eth.getBlock('latest', true);
-      const latestTx = await Promise.all(
-      latest.transactions.map((tx: any) => web3.eth.getTransaction(tx.hash)));
-      const resolved = await Promise.all(latestTx);
-      setTxList(resolved.filter(tx => tx.from === address || tx.to === address));
-    } catch (err) {
-      alert('트랜잭션 목록을 불러오지 못했습니다.');
     }
   };
 
@@ -79,44 +67,112 @@ const BlockchainExplorer = () => {
     fetchNetworkStatus();
   }, []);
 
+   
+
+const fetchTxListWithScanApi = async () => {
+  if (!address) return alert('지갑 주소를 입력하세요.');
+
+  try {
+    const response = await fetch(
+      `https://api.polygonscan.com/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc&apikey=${POLYGONSCAN_API_KEY}`
+    );
+    const data = await response.json();
+
+    if (data.status !== '1') {
+      throw new Error(data.result || '트랜잭션 내역이 없습니다.');
+    }
+
+    setTxList(data.result);
+  } catch (err: any) {
+    console.error(err);
+    alert(`에러 발생: ${err.message || JSON.stringify(err)}`);
+  }
+};
+
+
   return (
-    <div className="p-4 space-y-4">
+    <div className="explorer-container">
         <NavBar />
-      <div>
+      <div className="explorer-section">
         <h2>트랜잭션 조회</h2>
-        <input value={txHash} onChange={(e) => setTxHash(e.target.value)} placeholder="Tx Hash" />
-        <button onClick={fetchTransaction}>조회</button>
-        {txInfo && <pre>{safeStringify(txInfo)}</pre>}
+        <input className="explorer-input" value={txHash} onChange={(e) => setTxHash(e.target.value)} placeholder="Tx Hash" />
+        <button className="explorer-button" onClick={fetchTransaction}>조회</button>
+        {txInfo && (<div className="tx-info">
+        <p><strong>트랜잭션 해시:</strong> <span className="tx-hash">{txInfo.hash}</span></p>
+        <p><strong>블록 번호:</strong> {txInfo.blockNumber}</p>
+        <p><strong>송신자:</strong> <span className="tx-hash">{txInfo.from}</span></p>
+        <p><strong>수신자:</strong> <span className="tx-hash">{txInfo.to}</span></p>
+        <p><strong>보낸 금액:</strong> <span className="tx-amount">{web3.utils.fromWei(txInfo.value, 'ether')} MATIC</span></p>
+        <p><strong>상태:</strong> <span className={txInfo.status === '1' ? 'tx-status-success' : 'tx-status-failure'}>{txInfo.status === '1' ? '성공' : '실패'}</span></p>
+        <p><strong>가스 수수료:</strong> <span className="tx-gas">{(Number(txInfo.gasPrice) / 1e9).toFixed(2)} Gwei</span></p>
+        {txInfo.transactionIndex !== null && txInfo.transactionIndex !== undefined ? (
+        <p><strong>트랜잭션 위치:</strong> {Number(txInfo.transactionIndex) + 1} 번째</p>
+        ) : (
+        <p><strong>트랜잭션 위치:</strong> 정보 없음</p>
+        )}
+      </div>
+      )}
       </div>
 
-      <div>
+      <div className="explorer-section">
         <h2>블록 정보 조회</h2>
-        <input value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} placeholder="Block Number" />
-        <button onClick={fetchBlock}>조회</button>
-        {blockInfo && <pre>{safeStringify(blockInfo)}</pre>}
+        <input className="explorer-input" value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} placeholder="Block Number" />
+        <button className="explorer-button" onClick={fetchBlock}>조회</button>
+        {blockInfo && (
+          <div className="tx-info">
+            <p><strong>블록 번호:</strong> {blockInfo.number}</p>
+            <p><strong>블록 해시:</strong> <span className="tx-hash">{blockInfo.hash}</span></p>
+            <p><strong>블록 생성 시간:</strong> {new Date(Number(blockInfo.timestamp) * 1000).toLocaleString()}</p>
+            <p><strong>채굴자 주소:</strong> <span className="tx-hash">{blockInfo.miner}</span></p>
+            <p><strong>실제 사용된 가스량 / 블록의 최대 가스량:</strong> {blockInfo.gasUsed} / {blockInfo.gasLimit} Gas</p>
+            <p><strong>블록 크기:</strong> {blockInfo.size} bytes</p>
+            <p><strong>블록 내부 트랜재션 수:</strong> {blockInfo.transactions.length}</p>
+          </div>
+        )}
       </div>
 
-      <div>
+      <div className="explorer-section">
         <h2>지갑 정보</h2>
-        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Wallet Address" />
-        <button onClick={fetchBalance}>잔액 조회</button>
-        <button onClick={fetchTxList}>트랜잭션 내역</button>
-        {balance && <p>잔액: {balance} ETH</p>}
-        {txList.length > 0 && <pre>{safeStringify(txList)}</pre>}
+        <input className="explorer-input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Wallet Address" />
+        <button className="explorer-button" onClick={fetchBalance}>잔액 조회</button>
+        <button className="explorer-button" onClick={fetchTxListWithScanApi}>트랜잭션 내역</button>
+        {balance && <p className="tx-amount">잔액: {balance} ETH</p>}
+        {txList.length > 0 && (
+        <div className="tx-list">
+          <h3>트랜잭션 내역 (최근 {txList.length}건)</h3>
+          {txList.map((tx: any) => (
+          <div key={tx.hash} className="tx-list-item">
+          <p><strong>
+            <button
+            onClick={() => setSelectedHash(tx.hash)}
+            style={{ background: 'none', border: 'none', padding: 0, color:'#3498db', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+            트랜잭션 해시:
+            </button></strong> <span className="tx-hash">{tx.hash}</span></p>
+            {selectedHash === tx.hash && <TxHashDetail hash={tx.hash} />}
+          <p><strong>블록 번호:</strong> {tx.blockNumber}</p>
+          <p><strong>거래 시간:</strong> {new Date(Number(tx.timeStamp) * 1000).toLocaleString()}</p>
+          <p><strong>송신자:</strong> <span className="tx-hash">{tx.from}</span></p>
+          <p><strong>수신자:</strong> <span className="tx-hash">{tx.to}</span></p>
+          <hr></hr>
+        </div>
+      ))}
+    </div>
+  )}
       </div>
 
-      <div>
+      <div className="explorer-section">
         <h2>네트워크 상태 : {latestBlock ? ("정상") : ("오류")}</h2>
          {latestBlock ? (
-      <div className="text-sm text-gray-700 space-y-1">
-        <p>블록 생성 주기: <span className="font-mono">{latestBlock.blockTime}초</span></p>
-        <p>최신 블록 번호: <span className="font-mono">{latestBlock.latestBlockNumber}</span></p>
-        <p>현재 수수료(Gwei): <span className="font-mono">
+      <div className="network-status">
+        <p>블록 생성 주기: <span>{latestBlock.blockTime}초</span></p>
+        <p>최신 블록 번호: <span>{latestBlock.latestBlockNumber}</span></p>
+        <p>현재 수수료(Gwei): <span className="tx-gas">
         {(Number(latestBlock.gasPrice) / 1e9).toFixed(2)} Gwei
         </span></p>
       </div>
   ) : (
-    <p className="text-gray-500 text-sm">불러오는 중...</p>
+    <p className="loading">불러오는 중...</p>
   )}
       </div>
     </div>
