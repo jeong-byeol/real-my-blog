@@ -4,24 +4,26 @@ import NavBar from './NavBar';
 import TxHashDetail from './TxhashDetail';
 import './ExplorerPage.css';
 
-const web3 = new Web3('https://polygon-rpc.com'); 
 
-const POLYGONSCAN_API_KEY = '1Q34UIA6I4HKS4HZ3D6C3592Q4SHZPUGND';
+
+const web3 = new Web3('https://polygon-rpc.com'); //폴리곤 메인넷 rpc 사용
+
+const POLYGONSCAN_API_KEY = process.env.REACT_APP_POLYGONSCAN_API_KEY; // 폴리곤 api 사용
 
 const BlockchainExplorer = () => {
-  const [txHash, setTxHash] = useState('');  
-  const [txInfo, setTxInfo] = useState<any | null>(null); 
-  const [blockNumber, setBlockNumber] = useState('');
-  const [blockInfo, setBlockInfo] = useState<any | null>(null);
-  const [address, setAddress] = useState('');
-  const [balance, setBalance] = useState<string | null>(null);
-  const [txList, setTxList] = useState<any[]>([]); 
-  const [latestBlock, setLatestBlock] = useState<{
+  const [txHash, setTxHash] = useState('');  // 트랜잭션 해시 입력창
+  const [txInfo, setTxInfo] = useState<any | null>(null); // 트랜잭션 해시 입력 시 트랜잭션 정보들
+  const [blockNumber, setBlockNumber] = useState(''); // 블록 번호 입력창
+  const [blockInfo, setBlockInfo] = useState<any | null>(null); // 블록 번호 입력 시 블록 정보들
+  const [address, setAddress] = useState(''); // 계정 입력창
+  const [balance, setBalance] = useState<string | null>(null); // 계정 입력 시 잔액 정보
+  const [txList, setTxList] = useState<any[]>([]); // api로 얻은 트랜잭션 리스트
+  const [latestBlock, setLatestBlock] = useState<{ // 네트워크 상태
     blockTime: number;
     latestBlockNumber: number;
     gasPrice: string;
   } | null>(null);
-  const [selectedHash, setSelectedHash] = useState<string | null>(null);
+  const [selectedHash, setSelectedHash] = useState<string | null>(null); // "트랜잭션 해시: " 에 버튼으로 만들고 버튼클릭 시 트랜잭션 해시 넣는 곳
 
   const fetchTransaction = async () => { // 트랜잭션 조회
     try {

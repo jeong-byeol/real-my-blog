@@ -10,6 +10,7 @@ const NavBar = () => (
       <Link to="/new">글쓰기</Link>
       <Link to="/walletPage">지갑</Link>
       <Link to="/explorerPage">블록 익스플로어</Link>
+      <Link to="/smartcontract">스마트컨트랙트</Link>
     </div>
   </nav>
 );

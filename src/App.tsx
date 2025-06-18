@@ -7,6 +7,7 @@ import EditorPage from './components/EditorPage';
 import PostPage from './components/PostPage';
 import WalletPage from './components/WalletPage';
 import ExplorerPage from './components/ExplorerPage';
+import Smartcontract from './components/Smartcontract';
 
 interface Post {
   id: string;
@@ -58,6 +59,7 @@ function App() {
           <Route path="/walletPage" element={<WalletPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           <Route path="/ExplorerPage" element={<ExplorerPage />} />
+          <Route path="/smartcontract" element={<Smartcontract />} />
         </Routes>
       </div>
     </Router>
