@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { ethers } from "ethers";
 import axios from "axios";
 import NavBar from "./NavBar";
+import "./Smartcontract.css";
 
-  const apiKey = process.env.REACT_APP_POLYGONSCAN_API_KEY;
-  
+const apiKey = process.env.REACT_APP_POLYGONSCAN_API_KEY;
+
 // 네트워크 정의
 const NETWORKS = {
   cardona: {
@@ -29,8 +30,6 @@ const SmartcontractApp: React.FC = () => {
   const [networkKey, setNetworkKey] = useState<keyof typeof NETWORKS>("cardona");
   const [abi, setAbi] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-
 
   const lookupContract = async () => {
     setAbi(null);
@@ -76,36 +75,47 @@ const SmartcontractApp: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="smart-contract-container">
       <NavBar />
-      <h1>스마트 컨트랙트 조회</h1>
+      <h1 className="smart-contract-title">스마트 컨트랙트 조회</h1>
 
-      <input
-        type="text"
-        placeholder="컨트랙트 주소 (0x...)"
-        value={address}
-        onChange={(e) => setAddress(e.target.value)}
-      />
+      <div className="contract-form">
+        <input
+          className="contract-input"
+          type="text"
+          placeholder="컨트랙트 주소 (0x...)"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+        />
 
-      <select
-        value={networkKey}
-        onChange={(e) => setNetworkKey(e.target.value as keyof typeof NETWORKS)}
-      >
-        {Object.entries(NETWORKS).map(([key, net]) => (
-          <option key={key} value={key}>
-            {net.name}
-          </option>
-        ))}
-      </select>
+        <select
+          className="network-select"
+          value={networkKey}
+          onChange={(e) => setNetworkKey(e.target.value as keyof typeof NETWORKS)}
+        >
+          {Object.entries(NETWORKS).map(([key, net]) => (
+            <option key={key} value={key}>
+              {net.name}
+            </option>
+          ))}
+        </select>
 
-      <button onClick={lookupContract}>조회</button>
+        <button className="lookup-button" onClick={lookupContract}>
+          조회
+        </button>
+      </div>
 
-      {error && <p>❌ {error}</p>}
+      {error && (
+        <div className="error-message">
+          <span>❌</span>
+          <span>{error}</span>
+        </div>
+      )}
 
       {abi && (
-        <div>
-          <h2>ABI (일부):</h2>
-          <pre>{abi}</pre>
+        <div className="abi-container">
+          <h2 className="abi-title">ABI (일부):</h2>
+          <pre className="abi-content">{abi}</pre>
         </div>
       )}
     </div>
