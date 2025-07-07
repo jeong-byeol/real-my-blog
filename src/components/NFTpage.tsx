@@ -9,13 +9,12 @@ const CONTRACT_ADDRESS = "0xd2b7e98f7C93F3917093ac9C88E66A41DFDa5579";
 const RPC_URL = "https://public-en-kairos.node.kaia.io";
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
+const signer = new ethers.Wallet(process.env.REACT_APP_PRIVATE_KEY!, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, FNFT_ABI, signer);
 
-const NFTmint = () => {
+
   //민팅
-  const mint = await contract.mint()
-}
+
 
 const NFTpage = () => {
   // 토큰ID 소유자 조회

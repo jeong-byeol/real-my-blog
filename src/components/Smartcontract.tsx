@@ -5,7 +5,7 @@ import NavBar from "./NavBar";
 import "./Smartcontract.css";
 
 
-const apiKey = [process.env.PRIVATE_KEY!];
+const apiKey = [process.env.REACT_APP_PRIVATE_KEY!];
 
 // 네트워크 정의
 const NETWORKS = {
