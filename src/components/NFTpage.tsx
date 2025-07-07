@@ -12,9 +12,12 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(process.env.REACT_APP_PRIVATE_KEY!, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, FNFT_ABI, signer);
 
-
   //민팅
-
+  const mint = async (to: string, tokenURI: string) => {
+    const [address, setaddress] = useState<string | null>(null);
+    const [tokenURIm setTokenURI] = useState<string | null>(null);
+    const minting = await contract.mint(to, tokenURI)
+  }
 
 const NFTpage = () => {
   // 토큰ID 소유자 조회
