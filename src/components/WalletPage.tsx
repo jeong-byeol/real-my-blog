@@ -1,11 +1,12 @@
 import React, { useState } from "react"; 
 import Web3 from "web3";
+import { HDNodeWallet } from "ethers";
 import * as bip39 from "bip39";
 import { Wallet as EthersWallet } from "ethers";
 import "./Wallet.css"; 
 import NavBar from "./NavBar";
 
-const web3 = new Web3("https://rpc-amoy.polygon.technology");
+const web3 = new Web3("https://public-en-kairos.node.kaia.io");
 
 const Wallet = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null); // 주소 생성
@@ -26,7 +27,7 @@ const Wallet = () => {
    try { 
     const generatedMnemonic = bip39.generateMnemonic(); // 12단어 니모닉 생성
     console.log("Generated mnemonic:", generatedMnemonic);
-    const hdWallet = EthersWallet.fromMnemonic(generatedMnemonic); // 지갑 생성
+    const hdWallet = HDNodeWallet.fromPhrase(generatedMnemonic); // 지갑 생성
     console.log("HD Wallet address:", hdWallet.address);
 
     setMnemonic(generatedMnemonic);
@@ -58,7 +59,7 @@ const Wallet = () => {
         return;
       }
 
-    const wallet = EthersWallet.fromMnemonic(mnemonicInput.trim());
+    const wallet = HDNodeWallet.fromPhrase(mnemonicInput.trim());
     setrestoreAddress(wallet.address);
     setrestorePrivateKey(wallet.privateKey);
     setcopyMessage(null);

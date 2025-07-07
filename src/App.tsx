@@ -8,6 +8,7 @@ import PostPage from './components/PostPage';
 import WalletPage from './components/WalletPage';
 import ExplorerPage from './components/ExplorerPage';
 import Smartcontract from './components/Smartcontract';
+import NFTpage from "./components/NFTpage";
 
 interface Post {
   id: string;
@@ -60,6 +61,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
           <Route path="/ExplorerPage" element={<ExplorerPage />} />
           <Route path="/smartcontract" element={<Smartcontract />} />
+          <Route path="/NFTpage" element={<NFTpage />} />
         </Routes>
       </div>
     </Router>

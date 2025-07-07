@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Web3 from 'web3';
 import './TxhashDetail.css';
 
-const web3 = new Web3('https://polygon-rpc.com');
+const web3 = new Web3('https://public-en-kairos.node.kaia.io');
 
 interface TxHashDetailProps {
   hash: string;

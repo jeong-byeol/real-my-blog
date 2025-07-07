@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { ethers } from "ethers";
+import { JsonRpcProvider, ethers } from "ethers";
 import axios from "axios";
 import NavBar from "./NavBar";
 import "./Smartcontract.css";
 
-const apiKey = process.env.REACT_APP_POLYGONSCAN_API_KEY;
+
+const apiKey = [process.env.PRIVATE_KEY!];
 
 // 네트워크 정의
 const NETWORKS = {
@@ -23,6 +24,11 @@ const NETWORKS = {
     rpcUrl: "https://polygon-rpc.com",
     chainId: "137",
   },
+  kairos: {
+    name: "Kairos",
+    rpcUrl: "https://public-en-kairos.node.kaia.io",
+    chainId: "1001",
+  }
 };
 
 const SmartcontractApp: React.FC = () => {
@@ -36,13 +42,10 @@ const SmartcontractApp: React.FC = () => {
     setError(null);
 
     try {
-      if (!ethers.utils.isAddress(address)) {
-        setError("유효하지 않은 주소입니다.");
-        return;
-      }
+      
 
       const network = NETWORKS[networkKey];
-      const provider = new ethers.providers.JsonRpcProvider(network.rpcUrl);
+      const provider = new JsonRpcProvider(network.rpcUrl);
 
       const code = await provider.getCode(address);
       if (code === "0x") {
