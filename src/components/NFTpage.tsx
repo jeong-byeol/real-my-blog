@@ -12,14 +12,10 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(process.env.REACT_APP_PRIVATE_KEY!, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, FNFT_ABI, signer);
 
-  //민팅
-  const mint = async (to: string, tokenURI: string) => {
-    const [address, setaddress] = useState<string | null>(null);
-    const [tokenURIm setTokenURI] = useState<string | null>(null);
-    const minting = await contract.mint(to, tokenURI)
-  }
+  
 
 const NFTpage = () => {
+  const [address, setaddress] = useState("");
   // 토큰ID 소유자 조회
   const [tokenId, setTokenId] = useState("");
   const [owner, setOwner] = useState<string | null>(null);
@@ -34,6 +30,13 @@ const NFTpage = () => {
   // 단일 NFT 메타데이터
   const [meta, setMeta] = useState<any | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
+
+  //민팅
+  const mint = async () => {
+    const tokenURI = "https://api.pudgypenguins.io/lil/image/1248";
+    const tx = await contract.mint(address, tokenURI);
+    tx.wait();
+  }
 
   // 토큰ID 소유자 조회 핸들러
   const handleOwnerLookup = async () => {
@@ -107,6 +110,15 @@ const NFTpage = () => {
     <div className="nftpage-container">
       <NavBar />
       <h2>NFT 기능</h2>
+      <div className="nft-section">
+        <h3>민팅</h3>
+        <input
+          value={address}
+          onChange={e => setaddress(e.target.value)}
+          placeholder="수신자 주소"
+          />
+          <button onClick={mint}>민팅</button>
+      </div>
       <div className="nft-section">
         <h3>특정 토큰ID 소유자 조회</h3>
         <input
