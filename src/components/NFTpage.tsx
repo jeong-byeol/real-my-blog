@@ -4,14 +4,9 @@ import FNFT_ABI from "../abi/FNFT.json";
 import "./NFTpage.css";
 import NavBar from "./NavBar";
 import { io, Socket } from "socket.io-client";
-
+import { MetaMaskSDK } from "@metamask/sdk";
 
 const CONTRACT_ADDRESS = "0xA39fE2cf6dE605fB81FB45B60163367DD67F0F79";
-const RPC_URL = "https://public-en-kairos.node.kaia.io";
-
-const provider = new ethers.JsonRpcProvider(RPC_URL);
-const signer = new ethers.Wallet(process.env.REACT_APP_PRIVATE_KEY!, provider);
-const contract = new ethers.Contract(CONTRACT_ADDRESS, FNFT_ABI, signer);
 
 type TxData = {
   txHash: string;
@@ -21,6 +16,12 @@ type TxData = {
 };
 
 const NFTpage = () => {
+  //메타마스크 연결 시 UI활성화
+  const [isConnected, setIsConnected] = useState(false);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+  //메타마스크 연동
+  const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
+  const [contract, setContract] = useState<ethers.Contract | null>(null);
   //몇 번 이미지를 보낼지
   const [number, setNumber] = useState("");
   //민팅할 주소
@@ -31,7 +32,7 @@ const NFTpage = () => {
   const [ownerError, setOwnerError] = useState<string | null>(null);
 
   // 주소로 NFT 조회
-  const [userAddress, setUserAddress] = useState("");
+
   const [userNFTs, setUserNFTs] = useState<any[]>([]);
   const [nftError, setNftError] = useState<string | null>(null);
   const [loadingNFTs, setLoadingNFTs] = useState(false);
@@ -47,12 +48,6 @@ const NFTpage = () => {
   const [transferTokenId, setTransferTokenId] = useState("");
   const [transferTo, setTransferTo] = useState("");
   const [transferLoading, setTransferLoading] = useState(false);
-
-  // 특정 주소의 NFT tokenIds
-  // const [addressTokenIds, setAddressTokenIds] = useState<number[]>([]);
-  // const [addressNFTs, setAddressNFTs] = useState<any[]>([]);
-  // const [addressNFTLoading, setAddressNFTLoading] = useState(false);
-  // const [addressNFTError, setAddressNFTError] = useState<string | null>(null);
 
   // 전체 발행 NFT tokenIds
   const [allTokenIds, setAllTokenIds] = useState<string[]>([]); // number[] → string[]로 변경
@@ -72,6 +67,7 @@ const NFTpage = () => {
 
   //1. 민팅
   const mint = async () => {
+    if (!contract) return;
     setMintStatus("민팅 중...");
     try {
       const tokenURI = `https://storage.googleapis.com/jeonghanbyeol/metsdata/${number}.json`;
@@ -100,6 +96,7 @@ const NFTpage = () => {
 
   // 2. 토큰ID 소유자 조회 핸들러
   const handleOwnerLookup = async () => {
+    if (!contract) return;
     setOwner(null);
     setOwnerError(null);
     try {
@@ -110,11 +107,9 @@ const NFTpage = () => {
     }
   };
 
-
-
-
   // 6. NFT 전송 함수
   const handleTransfer = async () => {
+    if (!contract || !signer) return;
     setTransferLoading(true);
     try {
       const from = await signer.getAddress();
@@ -130,6 +125,7 @@ const NFTpage = () => {
 
   // 5.전체 발행 NFT tokenId 조회 
   const handleAllNFTs = async () => {
+    if (!contract) return;
     setAllNFTs([]);
     setAllTokenIds([]);
     setAllNFTError(null);
@@ -154,6 +150,7 @@ const NFTpage = () => {
 
   // 3. 특정 NFT 메타데이터/이미지 조회
   const handleMetaLookup = async () => {
+    if (!contract) return;
     setMeta(null);
     setMetaError(null);
     try {
@@ -166,13 +163,15 @@ const NFTpage = () => {
   };
 
   async function fetchMeta(tokenId: number): Promise<any> {
+    if (!contract) return null;
     const response = await contract.tokenURI(tokenId); //URI 가져옴
     const metadataResponse = await fetch(response); // 해당 URI에 HTTP요청
     return await metadataResponse.json(); // JSON 메타데이터 반환
-}
+  }
 
   // 4. 특정 주소의 NFT 목록 조회 함수 (메타데이터 포함)
   const handleUserNFTs = async (addressOverride?: string) => {
+    if (!contract) return;
     const targetAddress = addressOverride || userAddress;
     setUserNFTs([]);
     setNftError(null);
@@ -207,129 +206,203 @@ const NFTpage = () => {
       socket.off("newTx");
     };
   }, []);
-  
+
+  const [balance, setBalance] = useState<string | null>(null);
+
+//메타마스크 연결
+  const connectWallet = async () => {
+    try {
+      // 1. MetaMaskSDK 인스턴스 생성
+      const MMSDK = new MetaMaskSDK({
+        dappMetadata: {
+          name: "NFT Dapp",
+          url: window.location.href,
+        },
+      });
+      // 2. 계정 연결
+      const accounts = await MMSDK.connect();
+      if (!accounts || accounts.length === 0) throw new Error("No accounts");
+      setUserAddress(accounts[0]);
+      // 3. provider 생성 (ethers v6)
+      const mmProvider = MMSDK.getProvider();
+      if (!mmProvider) throw new Error("MetaMask provider not found");
+      const provider = new ethers.BrowserProvider(mmProvider);
+      // 4. signer 생성
+      const signer = await provider.getSigner();
+      setSigner(signer);
+      // 5. contract 인스턴스 생성 (signer로)
+      const contractInstance = new ethers.Contract(CONTRACT_ADDRESS, FNFT_ABI, signer);
+      setContract(contractInstance);
+      // 6. 잔액 조회
+      const bal = await provider.getBalance(accounts[0]);
+      setBalance(ethers.formatEther(bal));
+
+      setIsConnected(true);
+    } catch (err) {
+      alert("지갑 연결에 실패했습니다");
+    }
+  };
+
+
+  if (!isConnected) {
+  return (
+    <div style={{ textAlign: "center", marginTop: "4rem" }}>
+      <h2>NFT 기능을 사용하려면 메타마스크 지갑을 연결하세요</h2>
+      <button
+        onClick={connectWallet}
+        className="nft-connect-btn"
+        style={{
+          padding: "1rem 2rem",
+          fontSize: "1.2rem",
+          borderRadius: 8,
+          background: "#2563eb",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+        }}
+      >
+        메타마스크 지갑 연결
+      </button>
+    </div>
+  );
+}
 
 
   return (
     <div className="nftpage-container">
       <NavBar />
-      <h2>NFT 기능</h2>
-      <div className="nft-section">
-        <h3>1.민팅</h3>
-        <input
-          value={number}
-          onChange={e => setNumber(e.target.value)}
-          placeholder="민팅할 이미지 번호"
-          />
-        <input
-          value={address}
-          onChange={e => setaddress(e.target.value)}
-          placeholder="수신자 주소"
-          />
-          <button onClick={mint}>민팅</button>
-          {mintStatus && <div style={{marginTop:8, color: mintStatus === '민팅완료' ? 'green' : '#2563eb'}}>{mintStatus}</div>}
-      </div>
-      <div className="nft-section">
-        <h3>2.특정 토큰ID 소유자 조회</h3>
-        <input
-          value={tokenId}
-          onChange={e => setTokenId(e.target.value)}
-          placeholder="토큰ID 입력"
-        />
-        <button onClick={handleOwnerLookup}>소유자 조회</button>
-        {owner && <p>소유자: {owner}</p>}
-        {ownerError && <p style={{color:'red'}}>{ownerError}</p>}
-      </div>
-      <div className="nft-section">
-        <h3>3.특정 NFT 메타데이터/이미지 조회</h3>
-        <input
-          value={metaTokenId}
-          onChange={e => setMetaTokenId(e.target.value)}
-          placeholder="토큰ID 입력"
-        />
-        <button onClick={handleMetaLookup}>메타데이터 조회</button>
-        {meta && (
-          <div className="nft-meta">
-            <p>이름: {meta.name}</p>
-            <p>설명: {meta.description}</p>
-            {meta.image && <img src={meta.image} alt="nft" style={{maxWidth:200}} />}
-            <pre style={{fontSize:12, background:'#eee', padding:8}}>{JSON.stringify(meta, null, 2)}</pre>
+      <h2>연결된 지갑 잔액</h2>
+      {userAddress && (
+        <div style={{ marginBottom: 16, fontSize: '1.1rem' }}>
+          <b>지갑 주소:</b> {userAddress}<br />
+          <b>잔액:</b> {balance !== null ? `${balance} ETH` : '조회 중...'}
+        </div>
+      )}
+      {!signer ? (
+        <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+          <h2>NFT 기능을 사용하려면 메타마스크 지갑을 연결하세요</h2>
+          <button onClick={() => alert("메타마스크 지갑을 연결해주세요.")} className="nft-connect-btn" style={{ padding: '1rem 2rem', fontSize: '1.2rem', borderRadius: 8, background: '#2563eb', color: 'white', border: 'none', cursor: 'pointer' }}>지갑 연결</button>
+        </div>
+      ) : (
+        <>
+          <h2>NFT 기능</h2>
+          <div className="nft-section">
+            <h3>1.민팅</h3>
+            <input
+              value={number}
+              onChange={e => setNumber(e.target.value)}
+              placeholder="민팅할 이미지 번호"
+              />
+            <input
+              value={address}
+              onChange={e => setaddress(e.target.value)}
+              placeholder="수신자 주소"
+              />
+              <button onClick={mint}>민팅</button>
+              {mintStatus && <div style={{marginTop:8, color: mintStatus === '민팅완료' ? 'green' : '#2563eb'}}>{mintStatus}</div>}
           </div>
-        )}
-        {metaError && <p style={{color:'red'}}>{metaError}</p>}
-      </div>
-      <div className="nft-section">
-        <h3>4.특정 주소의 NFT 목록 조회</h3>
-        <input
-          value={userAddress}
-          onChange={e => setUserAddress(e.target.value)}
-          placeholder="지갑 주소 입력"
-        />
-        <button onClick={() => handleUserNFTs()} disabled={loadingNFTs}>
-          {loadingNFTs ? "조회 중..." : "NFT 조회"}
-        </button>
-        {nftError && <p style={{color:'red'}}>{nftError}</p>}
-        <div className="nft-list">
-          {userNFTs.map(nft => (
-            <div key={nft.tokenId} className="nft-card">
-              <p>Token ID: {nft.tokenId}</p>
-              {nft.meta && nft.meta.image && (
-                <img src={nft.meta.image} alt="nft" style={{maxWidth:150}} />
+          <div className="nft-section">
+            <h3>2.특정 토큰ID 소유자 조회</h3>
+            <input
+              value={tokenId}
+              onChange={e => setTokenId(e.target.value)}
+              placeholder="토큰ID 입력"
+            />
+            <button onClick={handleOwnerLookup}>소유자 조회</button>
+            {owner && <p>소유자: {owner}</p>}
+            {ownerError && <p style={{color:'red'}}>{ownerError}</p>}
+          </div>
+          <div className="nft-section">
+            <h3>3.특정 NFT 메타데이터/이미지 조회</h3>
+            <input
+              value={metaTokenId}
+              onChange={e => setMetaTokenId(e.target.value)}
+              placeholder="토큰ID 입력"
+            />
+            <button onClick={handleMetaLookup}>메타데이터 조회</button>
+            {meta && (
+              <div className="nft-meta">
+                <p>이름: {meta.name}</p>
+                <p>설명: {meta.description}</p>
+                {meta.image && <img src={meta.image} alt="nft" style={{maxWidth:200}} />}
+                <pre style={{fontSize:12, background:'#eee', padding:8}}>{JSON.stringify(meta, null, 2)}</pre>
+              </div>
+            )}
+            {metaError && <p style={{color:'red'}}>{metaError}</p>}
+          </div>
+          <div className="nft-section">
+            <h3>4.특정 주소의 NFT 목록 조회</h3>
+            <input
+              value={userAddress ?? ''}
+              onChange={e => setUserAddress(e.target.value)}
+              placeholder="지갑 주소 입력"
+            />
+            <button onClick={() => handleUserNFTs()} disabled={loadingNFTs}>
+              {loadingNFTs ? "조회 중..." : "NFT 조회"}
+            </button>
+            {nftError && <p style={{color:'red'}}>{nftError}</p>}
+            <div className="nft-list">
+              {userNFTs.map(nft => (
+                <div key={nft.tokenId} className="nft-card">
+                  <p>Token ID: {nft.tokenId}</p>
+                  {nft.meta && nft.meta.image && (
+                    <img src={nft.meta.image} alt="nft" style={{maxWidth:150}} />
+                  )}
+                  {nft.meta && <p>{nft.meta.name}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="nft-section">
+            <h3>5.전체 발행 NFT 목록 조회</h3>
+            <button onClick={handleAllNFTs} disabled={allNFTLoading}>{allNFTLoading ? "조회 중..." : "전체 NFT 조회"}</button>
+            {allNFTError && <p style={{color:'red'}}>{allNFTError}</p>}
+            <div className="nft-list">
+              {allTokenIds && <p>전체 토큰 Id 수: {allTokenIds.length}</p>}
+              {allNFTs.length === 0 && !allNFTLoading && !allNFTError && (
+                <p>아직 발행된 NFT가 없습니다.</p>
               )}
-              {nft.meta && <p>{nft.meta.name}</p>}
+              {allNFTs.map(nft => (
+                <div key={nft.tokenId} className="nft-card">
+                  <p>Token ID: {nft.tokenId}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="nft-section">
+            <h3>6.NFT 전송 (transfer)</h3>
+            <input
+              value={transferTokenId}
+              onChange={e => setTransferTokenId(e.target.value)}
+              placeholder="보낼 토큰ID"
+            />
+            <input
+              value={transferTo}
+              onChange={e => setTransferTo(e.target.value)}
+              placeholder="받는 주소"
+            />
+            <button onClick={handleTransfer} disabled={transferLoading}>
+              {transferLoading ? "전송 중..." : "NFT 전송"}
+            </button>
+            {txHash && <div>트랜잭션 해시: {txHash}</div>}
+          </div>     
+          {/* 실시간 트랜잭션 해시 표시 영역 */}
+          <h3>실시간 트랜잭션</h3>
+          {txList && txList.map((tx, idx) => (
+            <div key={tx.txHash + idx}>
+              <p><b>txHash:</b> {tx.txHash}</p>
+              <p><b>From:</b> {tx.from}</p>
+              <p><b>To:</b> {tx.to}</p>
+              <p><b>TokenID:</b> {tx.tokenId}</p>
+              <hr />
             </div>
           ))}
-        </div>
-      </div>
-      <div className="nft-section">
-        <h3>5.전체 발행 NFT 목록 조회</h3>
-        <button onClick={handleAllNFTs} disabled={allNFTLoading}>{allNFTLoading ? "조회 중..." : "전체 NFT 조회"}</button>
-        {allNFTError && <p style={{color:'red'}}>{allNFTError}</p>}
-        <div className="nft-list">
-          {allTokenIds && <p>전체 토큰 Id 수: {allTokenIds.length}</p>}
-          {allNFTs.length === 0 && !allNFTLoading && !allNFTError && (
-            <p>아직 발행된 NFT가 없습니다.</p>
-          )}
-          {allNFTs.map(nft => (
-            <div key={nft.tokenId} className="nft-card">
-              <p>Token ID: {nft.tokenId}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="nft-section">
-        <h3>6.NFT 전송 (transfer)</h3>
-        <input
-          value={transferTokenId}
-          onChange={e => setTransferTokenId(e.target.value)}
-          placeholder="보낼 토큰ID"
-        />
-        <input
-          value={transferTo}
-          onChange={e => setTransferTo(e.target.value)}
-          placeholder="받는 주소"
-        />
-        <button onClick={handleTransfer} disabled={transferLoading}>
-          {transferLoading ? "전송 중..." : "NFT 전송"}
-        </button>
-        {txHash && <div>트랜잭션 해시: {txHash}</div>}
-      </div>     
-      {/* 실시간 트랜잭션 해시 표시 영역 */}
-      <h3>실시간 트랜잭션</h3>
-      {txList && txList.map((tx, idx) => (
-        <div key={tx.txHash + idx}>
-          <p><b>txHash:</b> {tx.txHash}</p>
-          <p><b>From:</b> {tx.from}</p>
-          <p><b>To:</b> {tx.to}</p>
-          <p><b>TokenID:</b> {tx.tokenId}</p>
-          <hr />
-        </div>
-      ))}
-      </div>
+        </>
+      )}
+    </div>
 
  )
 }
-
 
 export default NFTpage;
 
