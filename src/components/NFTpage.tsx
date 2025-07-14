@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ethers } from "ethers";
+import { Web3 } from "web3";
 import FNFT_ABI from "../abi/FNFT.json";
 import "./NFTpage.css";
 import NavBar from "./NavBar";
-import { io, Socket } from "socket.io-client";
-import { MetaMaskSDK } from "@metamask/sdk";
+
+// MetaMask 타입 선언
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 const CONTRACT_ADDRESS = "0xA39fE2cf6dE605fB81FB45B60163367DD67F0F79";
 
@@ -13,15 +18,17 @@ type TxData = {
   from: string;
   to: string;
   tokenId: string;
+  eventType: string;
+  timestamp: string;
 };
 
 const NFTpage = () => {
-  //메타마스크 연결 시 UI활성화
-  const [isConnected, setIsConnected] = useState(false);
+  //Web3 연동
+  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [contract, setContract] = useState<any>(null);
+  const [accounts, setAccounts] = useState<string[]>([]);
   const [userAddress, setUserAddress] = useState<string | null>(null);
-  //메타마스크 연동
-  const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
-  const [contract, setContract] = useState<ethers.Contract | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   //몇 번 이미지를 보낼지
   const [number, setNumber] = useState("");
   //민팅할 주소
@@ -32,7 +39,6 @@ const NFTpage = () => {
   const [ownerError, setOwnerError] = useState<string | null>(null);
 
   // 주소로 NFT 조회
-
   const [userNFTs, setUserNFTs] = useState<any[]>([]);
   const [nftError, setNftError] = useState<string | null>(null);
   const [loadingNFTs, setLoadingNFTs] = useState(false);
@@ -61,32 +67,179 @@ const NFTpage = () => {
   // 민팅 상태 메시지
   const [mintStatus, setMintStatus] = useState<string | null>(null);
 
-  // socket 이벤트 리스닝 트랜잭션 해시 상태
+  // 블록체인 이벤트 관련 상태
   const [txList, setTxList] = useState<TxData[]>([]);
-  const socketRef = useRef<Socket | null>(null);
+  const [eventSubscription, setEventSubscription] = useState<any>(null);
+
+  const [balance, setBalance] = useState<string | null>(null);
+
+  // WebSocket 컨트랙트 참조
+  const contractRef = useRef<any>(null);
+
+  // Web3 초기화 및 연결된 지갑 확인
+  useEffect(() => {
+    const initWeb3 = async () => {
+      if (window.ethereum) {
+        const web3Instance = new Web3(window.ethereum);
+        setWeb3(web3Instance);
+        
+        // 컨트랙트 인스턴스 생성
+        const contractInstance = new web3Instance.eth.Contract(FNFT_ABI, CONTRACT_ADDRESS);
+        setContract(contractInstance);
+        
+        // localStorage에서 연결된 지갑 정보 확인
+        const savedAddress = localStorage.getItem('metamask_address');
+        const savedConnection = localStorage.getItem('metamask_connected');
+        
+        if (savedAddress && savedConnection === 'true') {
+          setUserAddress(savedAddress);
+          setAccounts([savedAddress]);
+          setIsConnected(true);
+          
+          // 잔액 조회
+          const bal = await web3Instance.eth.getBalance(savedAddress);
+          setBalance(web3Instance.utils.fromWei(bal, 'ether'));
+        }
+      } else {
+        console.error("MetaMask가 설치되어 있지 않습니다.");
+      }
+    };
+
+    initWeb3();
+  }, []);
+
+  // WebSocketProvider로 contractRef 생성 (이벤트 리스닝용)
+  useEffect(() => {
+    const wsProvider = new Web3.providers.WebsocketProvider('wss://base-sepolia.infura.io/ws/v3/b7497c1d6ddf4d94a13ca50026bc2f93');
+    if (Web3.utils.isAddress(CONTRACT_ADDRESS.trim())) {
+      const web3ws = new Web3(wsProvider);
+      contractRef.current = new web3ws.eth.Contract(FNFT_ABI as any, CONTRACT_ADDRESS.trim());
+    } else {
+      contractRef.current = null;
+    }
+    return () => {
+      wsProvider.disconnect();
+    };
+  }, []);
+
+  // transfer 이벤트 리스닝 (컨트랙트 주소, 토큰ID, 지갑주소 변경 시마다)
+  useEffect(() => {
+    if (!contractRef.current) return;
+    const contract = contractRef.current;
+    
+    // 토큰ID 조회용 이벤트
+    let tokenIdListener: any;
+    if (tokenId) {
+      tokenIdListener = contract.events.Transfer({ filter: { tokenId: Number(tokenId) } })
+        .on('data', () => {
+          handleOwnerLookup(); // 토큰ID 조회 자동 갱신
+        });
+    }
+    
+    // 지갑주소 조회용 이벤트
+    let walletListener: any;
+    if (address) {
+      walletListener = contract.events.Transfer({ filter: { to: address } })
+        .on('data', () => {
+          handleUserNFTs(); // 지갑주소로 들어오는 NFT 실시간 반영
+        });
+    }
+    
+    return () => {
+      if (tokenIdListener && tokenIdListener.unsubscribe) tokenIdListener.unsubscribe();
+      if (walletListener && walletListener.unsubscribe) walletListener.unsubscribe();
+    };
+  }, [tokenId, address]);
+
+  // 블록체인 이벤트 구독 (기본 이벤트)
+  useEffect(() => {
+    if (!contract) return;
+
+    const subscribeToEvents = () => {
+      try {
+        // Transfer 이벤트 구독 (ERC721)
+        const transferSubscription = contract.events.Transfer({})
+          .on('data', (event: any) => {
+            console.log('Transfer event received:', event);
+            
+            const txData: TxData = {
+              txHash: event.transactionHash,
+              from: event.returnValues.from,
+              to: event.returnValues.to,
+              tokenId: event.returnValues.tokenId,
+              eventType: 'Transfer',
+              timestamp: new Date().toISOString()
+            };
+            
+            setTxList(prev => [txData, ...prev.slice(0, 9)]); // 최대 10개만 유지
+          })
+          .on('error', (error: any) => {
+            console.error('Transfer event error:', error);
+          });
+
+        // Approval 이벤트 구독
+        const approvalSubscription = contract.events.Approval({})
+          .on('data', (event: any) => {
+            console.log('Approval event received:', event);
+            
+            const txData: TxData = {
+              txHash: event.transactionHash,
+              from: event.returnValues.owner,
+              to: event.returnValues.approved,
+              tokenId: event.returnValues.tokenId,
+              eventType: 'Approval',
+              timestamp: new Date().toISOString()
+            };
+            
+            setTxList(prev => [txData, ...prev.slice(0, 9)]); // 최대 10개만 유지
+          })
+          .on('error', (error: any) => {
+            console.error('Approval event error:', error);
+          });
+
+        setEventSubscription({ 
+          transfer: transferSubscription, 
+          approval: approvalSubscription 
+        });
+        console.log('Blockchain event subscription started');
+      } catch (error) {
+        console.error('Failed to subscribe to blockchain events:', error);
+      }
+    };
+
+    subscribeToEvents();
+
+    // Cleanup function
+    return () => {
+      if (eventSubscription) {
+        if (eventSubscription.transfer) {
+          eventSubscription.transfer.removeAllListeners();
+        }
+        if (eventSubscription.approval) {
+          eventSubscription.approval.removeAllListeners();
+        }
+      }
+    };
+  }, [contract]);
 
   //1. 민팅
   const mint = async () => {
-    if (!contract) return;
+    if (!contract || !accounts[0]) return;
     setMintStatus("민팅 중...");
     try {
       const tokenURI = `https://storage.googleapis.com/jeonghanbyeol/metsdata/${number}.json`;
-      const tx = await contract.mint(address, tokenURI);
-      const receipt = await tx.wait();
+      const result = await contract.methods.mint(address, tokenURI).send({
+        from: accounts[0],
+        gas: 3000000
+      });
+      
       // Transfer 이벤트에서 토큰ID 추출
       let mintedTokenId = null;
-      if (receipt && receipt.logs) {
-        for (const log of receipt.logs) {
-          try {
-            const parsed = contract.interface.parseLog(log);
-            if (parsed && parsed.name === "Transfer") {
-              mintedTokenId = parsed.args.tokenId?.toString();
-              break;
-            }
-          } catch {}
-        }
+      if (result.events && result.events.Transfer) {
+        mintedTokenId = result.events.Transfer.returnValues.tokenId;
       }
-      setMintStatus(`민팅완료, 해시 : ${tx.hash}, 토큰ID : ${mintedTokenId}`);
+      
+      setMintStatus(`민팅완료, 해시 : ${result.transactionHash}, 토큰ID : ${mintedTokenId}`);
       
     } catch (e: any) {
       setMintStatus(null);
@@ -100,7 +253,7 @@ const NFTpage = () => {
     setOwner(null);
     setOwnerError(null);
     try {
-      const result = await contract.ownerOf(tokenId);
+      const result = await contract.methods.ownerOf(tokenId).call();
       setOwner(result);
     } catch (e: any) {
       setOwnerError("존재하지 않는 토큰이거나 조회 실패");
@@ -109,14 +262,15 @@ const NFTpage = () => {
 
   // 6. NFT 전송 함수
   const handleTransfer = async () => {
-    if (!contract || !signer) return;
+    if (!contract || !accounts[0]) return;
     setTransferLoading(true);
     try {
-      const from = await signer.getAddress();
-      const tx = await contract.transferFrom(from, transferTo, transferTokenId);
-      setTxHash(tx.hash);
-      await tx.wait();
-      alert(`전송 성공!\n트랜잭션 해시: ${tx.hash}`);
+      const result = await contract.methods.transferFrom(accounts[0], transferTo, transferTokenId).send({
+        from: accounts[0],
+        gas: 3000000
+      });
+      setTxHash(result.transactionHash);
+      alert(`전송 성공!\n트랜잭션 해시: ${result.transactionHash}`);
     } catch (e: any) {
       alert("전송 실패: " + (e?.message || e));
     }
@@ -131,10 +285,10 @@ const NFTpage = () => {
     setAllNFTError(null);
     setAllNFTLoading(true);
     try {
-      const total = await contract.totalSupply();
+      const total = await contract.methods.totalSupply().call();
       const tokenIds: string[] = [];
       for (let i = 0; i < total; i++) {
-        const tokenId = await contract.tokenByIndex(i);
+        const tokenId = await contract.methods.tokenByIndex(i).call();
         tokenIds.push(tokenId.toString());
       }
       setAllTokenIds(tokenIds);
@@ -164,7 +318,7 @@ const NFTpage = () => {
 
   async function fetchMeta(tokenId: number): Promise<any> {
     if (!contract) return null;
-    const response = await contract.tokenURI(tokenId); //URI 가져옴
+    const response = await contract.methods.tokenURI(tokenId).call(); //URI 가져옴
     const metadataResponse = await fetch(response); // 해당 URI에 HTTP요청
     return await metadataResponse.json(); // JSON 메타데이터 반환
   }
@@ -177,10 +331,10 @@ const NFTpage = () => {
     setNftError(null);
     setLoadingNFTs(true);
     try {
-      const balance = await contract.balanceOf(targetAddress);
+      const balance = await contract.methods.balanceOf(targetAddress).call();
       const nfts = [];
       for (let i = 0; i < balance; i++) {
-        const tokenId = await contract.tokenOfOwnerByIndex(targetAddress, i);
+        const tokenId = await contract.methods.tokenOfOwnerByIndex(targetAddress, i).call();
         const meta = await fetchMeta(Number(tokenId));
         nfts.push({ tokenId: tokenId.toString(), meta });
       }
@@ -192,81 +346,33 @@ const NFTpage = () => {
     setLoadingNFTs(false);
   };
 
-  // 소켓 연결 및 트랜잭션 이벤트 리스너 등록
-  useEffect(() => {
-    const socket = io("http://localhost:3000");
-    socketRef.current = socket;
-
-    socket.on("newTx", (data) => {
-      setTxList(prev => [data, ...prev]);
-    });
-
-    return () => {
-      socket.disconnect();
-      socket.off("newTx");
-    };
-  }, []);
-
-  const [balance, setBalance] = useState<string | null>(null);
-
-//메타마스크 연결
-  const connectWallet = async () => {
-    try {
-      // 1. MetaMaskSDK 인스턴스 생성
-      const MMSDK = new MetaMaskSDK({
-        dappMetadata: {
-          name: "NFT Dapp",
-          url: window.location.href,
-        },
-      });
-      // 2. 계정 연결
-      const accounts = await MMSDK.connect();
-      if (!accounts || accounts.length === 0) throw new Error("No accounts");
-      setUserAddress(accounts[0]);
-      // 3. provider 생성 (ethers v6)
-      const mmProvider = MMSDK.getProvider();
-      if (!mmProvider) throw new Error("MetaMask provider not found");
-      const provider = new ethers.BrowserProvider(mmProvider);
-      // 4. signer 생성
-      const signer = await provider.getSigner();
-      setSigner(signer);
-      // 5. contract 인스턴스 생성 (signer로)
-      const contractInstance = new ethers.Contract(CONTRACT_ADDRESS, FNFT_ABI, signer);
-      setContract(contractInstance);
-      // 6. 잔액 조회
-      const bal = await provider.getBalance(accounts[0]);
-      setBalance(ethers.formatEther(bal));
-
-      setIsConnected(true);
-    } catch (err) {
-      alert("지갑 연결에 실패했습니다");
-    }
-  };
 
 
   if (!isConnected) {
-  return (
-    <div style={{ textAlign: "center", marginTop: "4rem" }}>
-      <h2>NFT 기능을 사용하려면 메타마스크 지갑을 연결하세요</h2>
-      <button
-        onClick={connectWallet}
-        className="nft-connect-btn"
-        style={{
-          padding: "1rem 2rem",
-          fontSize: "1.2rem",
-          borderRadius: 8,
-          background: "#2563eb",
-          color: "white",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        메타마스크 지갑 연결
-      </button>
-    </div>
-  );
-}
-
+    return (
+      <div style={{ textAlign: "center", marginTop: "4rem" }}>
+        <h2>NFT 기능을 사용하려면 메타마스크 지갑을 연결하세요</h2>
+        <p style={{ marginBottom: "2rem", color: "#666" }}>
+          MetaMask 페이지에서 지갑을 먼저 연결해주세요.
+        </p>
+        <button
+          onClick={() => window.location.href = '/metamask'}
+          className="nft-connect-btn"
+          style={{
+            padding: "1rem 2rem",
+            fontSize: "1.2rem",
+            borderRadius: 8,
+            background: "#2563eb",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          MetaMask 연결 페이지로 이동
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="nftpage-container">
@@ -278,7 +384,7 @@ const NFTpage = () => {
           <b>잔액:</b> {balance !== null ? `${balance} ETH` : '조회 중...'}
         </div>
       )}
-      {!signer ? (
+      {!contract ? (
         <div style={{ textAlign: 'center', marginTop: '4rem' }}>
           <h2>NFT 기능을 사용하려면 메타마스크 지갑을 연결하세요</h2>
           <button onClick={() => alert("메타마스크 지갑을 연결해주세요.")} className="nft-connect-btn" style={{ padding: '1rem 2rem', fontSize: '1.2rem', borderRadius: 8, background: '#2563eb', color: 'white', border: 'none', cursor: 'pointer' }}>지갑 연결</button>
@@ -386,22 +492,29 @@ const NFTpage = () => {
             </button>
             {txHash && <div>트랜잭션 해시: {txHash}</div>}
           </div>     
-          {/* 실시간 트랜잭션 해시 표시 영역 */}
-          <h3>실시간 트랜잭션</h3>
-          {txList && txList.map((tx, idx) => (
-            <div key={tx.txHash + idx}>
-              <p><b>txHash:</b> {tx.txHash}</p>
-              <p><b>From:</b> {tx.from}</p>
-              <p><b>To:</b> {tx.to}</p>
-              <p><b>TokenID:</b> {tx.tokenId}</p>
-              <hr />
-            </div>
-          ))}
+          {/* 실시간 블록체인 이벤트 표시 영역 */}
+          <h3>실시간 블록체인 이벤트</h3>
+          <p style={{ color: '#666', fontStyle: 'italic' }}>
+            블록체인에서 발생하는 Transfer 및 Approval 이벤트를 실시간으로 모니터링합니다.
+          </p>
+          {txList.length === 0 ? (
+            <p style={{ color: '#999' }}>아직 이벤트가 발생하지 않았습니다. 트랜잭션을 실행해보세요.</p>
+          ) : (
+            txList.map((tx: TxData, idx: number) => (
+              <div key={tx.txHash + idx} style={{ border: '1px solid #ddd', padding: '10px', margin: '5px 0', borderRadius: '5px' }}>
+                <p><b>Event Type:</b> {tx.eventType}</p>
+                <p><b>txHash:</b> {tx.txHash}</p>
+                <p><b>From:</b> {tx.from}</p>
+                <p><b>To:</b> {tx.to}</p>
+                <p><b>TokenID:</b> {tx.tokenId}</p>
+                <p><b>Time:</b> {new Date(tx.timestamp).toLocaleString()}</p>
+              </div>
+            ))
+          )}
         </>
       )}
     </div>
-
- )
+  );
 }
 
 export default NFTpage;

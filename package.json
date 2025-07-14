@@ -4,7 +4,7 @@
   "private": true,
   "homepage": "https://jeong-byeol.github.io/real-my-blog",
   "dependencies": {
-    "@metamask/sdk": "^0.32.0",
+    "@metamask/sdk": "^0.32.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -21,8 +21,6 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.1",
     "react-scripts": "5.0.1",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4",
     "web3": "^4.16.0"

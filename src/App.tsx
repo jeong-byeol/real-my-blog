@@ -9,6 +9,8 @@ import WalletPage from './components/WalletPage';
 import ExplorerPage from './components/ExplorerPage';
 import Smartcontract from './components/Smartcontract';
 import NFTpage from "./components/NFTpage";
+import ERC1155page from './components/ERC1155page';
+import MetamaskPage from './components/MetamaskPage';
 
 interface Post {
   id: string;
@@ -42,7 +44,7 @@ function App() {
   };
 
   return (
-    <Router basename="/real-my-blog">
+    <Router>
       <div className="App">
         <Routes>
           <Route path="/" element={<HomePage posts={posts} />} />
@@ -57,11 +59,13 @@ function App() {
               />
             }
           />
+          <Route path="/metamask" element={<MetamaskPage />} />
           <Route path="/walletPage" element={<WalletPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
           <Route path="/ExplorerPage" element={<ExplorerPage />} />
           <Route path="/smartcontract" element={<Smartcontract />} />
           <Route path="/NFTpage" element={<NFTpage />} />
+          <Route path="/erc1155" element={<ERC1155page />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>
