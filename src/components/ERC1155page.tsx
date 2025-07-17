@@ -249,7 +249,7 @@ const ERC1155page = () => {
       {/* 지갑 연결 상태 표시 */}
       <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc' }}>
         <h3>지갑 연결 상태</h3>
-        {!isConnected ? (
+        {!isConnected && web3 ? (
           <div>
             <p>지갑이 연결되지 않았습니다.</p>
             <button onClick={() => window.location.href = '/metamask'}>

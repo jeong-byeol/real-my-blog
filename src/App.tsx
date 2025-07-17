@@ -11,6 +11,8 @@ import Smartcontract from './components/Smartcontract';
 import NFTpage from "./components/NFTpage";
 import ERC1155page from './components/ERC1155page';
 import MetamaskPage from './components/MetamaskPage';
+import ProxyPage from './components/ProxyPage';
+import Staking from './components/Staking';
 
 interface Post {
   id: string;
@@ -65,6 +67,8 @@ function App() {
           <Route path="/smartcontract" element={<Smartcontract />} />
           <Route path="/NFTpage" element={<NFTpage />} />
           <Route path="/erc1155" element={<ERC1155page />} />
+          <Route path="/staking" element={<Staking />} />
+          <Route path="/proxyPage" element={<ProxyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

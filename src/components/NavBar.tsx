@@ -14,6 +14,8 @@ const NavBar = () => (
       <Link to="/smartcontract">스마트컨트랙트</Link>
       <Link to="/NFTpage">NFT</Link>
       <Link to="/erc1155">ERC1155</Link>
+      <Link to="/proxyPage">프록시</Link>
+      <Link to="/staking">스테이킹</Link>
     </div>
   </nav>
 );
