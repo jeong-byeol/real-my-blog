@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/real-my-blog/static/css/main.ce59aa77.css",
+    "main.js": "/real-my-blog/static/js/main.49538036.js",
+    "index.html": "/real-my-blog/index.html",
+    "main.ce59aa77.css.map": "/real-my-blog/static/css/main.ce59aa77.css.map",
+    "main.49538036.js.map": "/real-my-blog/static/js/main.49538036.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ce59aa77.css",
+    "static/js/main.49538036.js"
+  ]
+}
